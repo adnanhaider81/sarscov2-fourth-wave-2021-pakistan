@@ -113,7 +113,7 @@ You can produce an Auspice JSON for interactive viewing.
 
 ## How to cite
 - Paper: Umair M, Ikram A, Rehman Z, Haider SA, Ammar M, Badar N, Ali Q, Rana MS, Salman M. Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic. Journal of Medical Virology. 2022. https://doi.org/10.1002/jmv.27957
-- Software: Haider SA. SARS-CoV-2 fourth wave Pakistan analysis. Version 1.0.0. GitHub repository. Include commit hash when available.
+- Software: Haider SA. SARS-CoV-2 fourth wave Pakistan analysis. Version 4.3.0. GitHub repository.
 
 ## References
 - Andrews S. 2010. FastQC. Babraham Bioinformatics.
