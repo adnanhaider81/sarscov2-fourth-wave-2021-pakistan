@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: Please cite this code and the associated paper.
+title: SARS-CoV-2 fourth wave Pakistan analysis
+authors:
+  - family-names: Haider
+    given-names: Syed Adnan
+version: 1.0.0
+date-released: 2025-09-29
+preferred-citation:
+  type: article
+  title: Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic
+  authors:
+    - family-names: Umair
+      given-names: Massab
+    - family-names: Ikram
+      given-names: Aamer
+    - family-names: Rehman
+      given-names: Zaira
+    - family-names: Haider
+      given-names: Syed A.
+    - family-names: Ammar
+      given-names: Muhammad
+    - family-names: Badar
+      given-names: Nazish
+    - family-names: Ali
+      given-names: Qasim
+    - family-names: Rana
+      given-names: Muhammad S.
+    - family-names: Salman
+      given-names: Muhammad
+  year: 2022
+  journal: Journal of Medical Virology
+  doi: 10.1002/jmv.27957

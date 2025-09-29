@@ -1,0 +1,29 @@
+pairs:
+  - sample: ISL_001
+    r1: data-private/ISL_001_R1.fastq.gz
+    r2: data-private/ISL_001_R2.fastq.gz
+
+reference:
+  acc: NC_045512.2
+
+context_accessions:
+  - NC_045512.2
+
+pangolin:
+  enable: true
+
+augur:
+  enable: true
+
+params:
+  threads: 4
+  min_depth_consensus: 10
+  min_qual: 20
+  iqtree_model_wg: GTR+G+I
+  bootstrap: 1000
+  use_model_finder: false
+  filter_min_length: 29500
+  subsampling: 250
+  clock_rate: 0.0008
+  clock_std_dev: 0.0004
+  root: Wuhan/Hu-1/2019

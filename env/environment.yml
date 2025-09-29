@@ -1,0 +1,26 @@
+name: sarscov2-fourthwave-env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - pandas
+  - matplotlib
+  - biopython
+  - pyyaml
+  - snakemake
+  - fastqc=0.11.9
+  - trimmomatic=0.39
+  - bwa
+  - samtools
+  - bcftools
+  - mafft
+  - iqtree
+  - pangolin
+  - augur
+  - treetime
+  - auspice
+  - blast
+  - entrez-direct
+  - picard

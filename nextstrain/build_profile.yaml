@@ -1,0 +1,15 @@
+inputs:
+  sequences: results/consensus/all_consensus.fasta
+  metadata: data-private/metadata.tsv
+  colors: nextstrain/colors.tsv
+  latlongs: nextstrain/lat_longs.tsv
+
+params:
+  clock_rate: 0.0008
+  clock_std_dev: 0.0004
+  root: 'Wuhan/Hu-1/2019'
+  filter_min_length: 29500
+  subsampling: 250
+
+outputs:
+  auspice_json: results/nextstrain/auspice/sarscov2_fourth_wave.json

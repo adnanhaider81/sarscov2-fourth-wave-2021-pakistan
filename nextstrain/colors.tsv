@@ -1,0 +1,10 @@
+# attribute	value	color
+region	Asia	#8dd3c7
+region	Europe	#ffffb3
+region	Africa	#bebada
+region	North America	#fb8072
+region	South America	#80b1d3
+region	Oceania	#fdb462
+lineage	B.1.617.2	#1b9e77
+lineage	AY.*	#d95f02
+lineage	BA.*	#7570b3

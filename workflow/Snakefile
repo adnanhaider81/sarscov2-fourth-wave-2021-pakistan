@@ -1,0 +1,207 @@
+# Snakemake pipeline for SARS-CoV-2 fourth-wave analysis in Pakistan
+
+import yaml, os
+cfg = yaml.safe_load(open("config/config.yaml"))
+
+SAMPLES = [x.get("sample","ISL_001") for x in cfg.get("pairs", [{"sample":"ISL_001","r1":"data-private/ISL_001_R1.fastq.gz","r2":"data-private/ISL_001_R2.fastq.gz"}])]
+META = {x.get("sample","ISL_001"): x for x in cfg.get("pairs", [])}
+if not META:
+    META = {"ISL_001": {"r1":"data-private/ISL_001_R1.fastq.gz","r2":"data-private/ISL_001_R2.fastq.gz"}}
+
+THREADS = cfg["params"]["threads"]
+MIN_DP = cfg["params"]["min_depth_consensus"]
+MODEL = cfg["params"]["iqtree_model_wg"]
+BOOT = cfg["params"]["bootstrap"]
+USE_MF = cfg["params"].get("use_model_finder", False)
+AUGUR = cfg.get("augur", {}).get("enable", False)
+PANGOLIN = cfg.get("pangolin", {}).get("enable", True)
+
+rule all:
+    input:
+        expand("results/consensus/{s}.fa", s=SAMPLES),
+        "results/consensus/all_consensus.fasta",
+        "results/aln/wg_alignment.fasta",
+        "results/iqtree/wg.treefile",
+        "results/pangolin/lineage_report.csv"
+
+rule fetch_ref:
+    output:
+        fa="refs/ref.fasta"
+    params:
+        acc=cfg["reference"]["acc"]
+    shell:
+        "python analysis/scripts/fetch_genbank_single.py --acc {params.acc} --out_fasta {output.fa}"
+
+rule fastqc:
+    input:
+        r1=lambda w: META[w.s]["r1"],
+        r2=lambda w: META[w.s]["r2"]
+    output:
+        html1="work/{s}.R1.fastqc.html",
+        html2="work/{s}.R2.fastqc.html"
+    threads: 1
+    shell:
+        "fastqc -o work {input.r1} {input.r2}"
+
+rule trim:
+    input:
+        r1=lambda w: META[w.s]["r1"],
+        r2=lambda w: META[w.s]["r2"]
+    output:
+        r1="work/{s}.R1.trim.fastq.gz",
+        r2="work/{s}.R2.trim.fastq.gz"
+    params:
+        adapters="env/TruSeq3-PE.fa"
+    threads: THREADS
+    shell:
+        "trimmomatic PE -threads {threads} {input.r1} {input.r2} "
+        "{output.r1} /dev/null {output.r2} /dev/null "
+        "ILLUMINACLIP:{params.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:30 MINLEN:50"
+
+rule map_bwa:
+    input:
+        r1="work/{s}.R1.trim.fastq.gz",
+        r2="work/{s}.R2.trim.fastq.gz",
+        ref="refs/ref.fasta"
+    output:
+        bam="work/{s}.sorted.bam"
+    threads: THREADS
+    shell:
+        "bwa index {input.ref} && "
+        "bwa mem -t {threads} {input.ref} {input.r1} {input.r2} | samtools sort -@ {threads} -o {output.bam} && "
+        "samtools index {output.bam}"
+
+rule call_and_consensus:
+    input:
+        bam="work/{s}.sorted.bam",
+        ref="refs/ref.fasta"
+    output:
+        depth="work/{s}.depth.txt",
+        mask="work/{s}.mask.bed",
+        vcf="work/{s}.variants.vcf.gz",
+        cons="results/consensus/{s}.fa"
+    params:
+        min_dp=MIN_DP
+    threads: THREADS
+    shell:
+        "samtools depth -a {input.bam} > {output.depth} && "
+        "awk -v OFS='\\t' -v MIN={params.min_dp} '{ if ($3<MIN) print $1, $2-1, $2 }' {output.depth} > {output.mask} && "
+        "bcftools mpileup -Ou -f {input.ref} {input.bam} | bcftools call -mv -Oz -o {output.vcf} && bcftools index {output.vcf} && "
+        "bcftools consensus -f {input.ref} -m {output.mask} {output.vcf} > {output.cons}"
+
+rule combine_consensus:
+    input:
+        expand("results/consensus/{s}.fa", s=SAMPLES)
+    output:
+        "results/consensus/all_consensus.fasta"
+    shell:
+        "cat {input} > {output}"
+
+rule fetch_context:
+    output:
+        "results/refs/context.fasta"
+    run:
+        with open("config/context.txt","w") as f:
+            for acc in cfg.get("context_accessions", []):
+                f.write(acc + "\\n")
+        shell("python analysis/scripts/fetch_genbank.py --acc config/context.txt --out_fasta {output}")
+
+rule align_wg:
+    input:
+        cons="results/consensus/all_consensus.fasta",
+        ctx="results/refs/context.fasta"
+    output:
+        "results/aln/wg_alignment.fasta"
+    shell:
+        "mkdir -p results/aln && cat {input.cons} {input.ctx} > results/aln/wg_input.fasta && mafft --auto results/aln/wg_input.fasta > {output}"
+
+rule iqtree_wg:
+    input:
+        aln="results/aln/wg_alignment.fasta"
+    output:
+        tree="results/iqtree/wg.treefile"
+    params:
+        model=MODEL,
+        bb=BOOT,
+        mf=" -m MFP" if USE_MF else ""
+    threads: 2
+    shell:
+        "mkdir -p results/iqtree && iqtree -s {input.aln} {params.mf} -m {params.model} -bb {params.bb} -nt {threads} -pre results/iqtree/wg"
+
+rule pangolin:
+    input:
+        cons="results/consensus/all_consensus.fasta"
+    output:
+        "results/pangolin/lineage_report.csv"
+    run:
+        if PANGOLIN:
+            shell("mkdir -p results/pangolin && pangolin {input.cons} --outfile results/pangolin/lineage_report.csv")
+        else:
+            shell("mkdir -p results/pangolin && echo 'disabled' > results/pangolin/lineage_report.csv")
+
+# Nextstrain steps
+AUGUR_ENABLE = cfg.get("augur", {}).get("enable", False)
+if AUGUR_ENABLE:
+    rule augur_filter:
+        input:
+            seqs="results/consensus/all_consensus.fasta",
+            meta="data-private/metadata.tsv"
+        output:
+            seqs="results/nextstrain/filtered.fasta",
+            meta="results/nextstrain/filtered_metadata.tsv"
+        params:
+            minlen=cfg.get("params", {}).get("filter_min_length", 29500)
+        shell:
+            "mkdir -p results/nextstrain && "
+            "augur filter --sequences {input.seqs} --metadata {input.meta} "
+            "--min-length {params.minlen} --max-date 2025-12-31 --min-date 2019-12-01 "
+            "--output {output.seqs} --metadata-output {output.meta}"
+
+    rule augur_align:
+        input:
+            seqs="results/nextstrain/filtered.fasta"
+        output:
+            aln="results/nextstrain/aligned.fasta"
+        shell:
+            "augur align --sequences {input.seqs} --reference-sequence refs/ref.fasta --output {output.aln} --fill-gaps"
+
+    rule augur_tree_full:
+        input:
+            aln="results/nextstrain/aligned.fasta"
+        output:
+            tree="results/nextstrain/tree_raw.nwk"
+        shell:
+            "augur tree --alignment {input.aln} --output {output.tree}"
+
+    rule augur_refine_full:
+        input:
+            tree="results/nextstrain/tree_raw.nwk",
+            aln="results/nextstrain/aligned.fasta",
+            meta="results/nextstrain/filtered_metadata.tsv"
+        output:
+            tree="results/nextstrain/tree_time.nwk",
+            node="results/nextstrain/node_data.json"
+        params:
+            clock=cfg.get("params", {}).get("clock_rate", 0.0008),
+            stdev=cfg.get("params", {}).get("clock_std_dev", 0.0004),
+            root=cfg.get("params", {}).get("root", "Wuhan/Hu-1/2019")
+        shell:
+            "augur refine --tree {input.tree} --alignment {input.aln} --metadata {input.meta} "
+            "--coalescent skyline --clock-rate {params.clock} --clock-std-dev {params.stdev} "
+            "--root {params.root} --timetree --output-tree {output.tree} --output-node-data {output.node}"
+
+    rule augur_export:
+        input:
+            tree="results/nextstrain/tree_time.nwk",
+            aln="results/nextstrain/aligned.fasta",
+            meta="results/nextstrain/filtered_metadata.tsv",
+            node="results/nextstrain/node_data.json"
+        output:
+            json="results/nextstrain/auspice/sarscov2_fourth_wave.json"
+        params:
+            colors="nextstrain/colors.tsv",
+            latlng="nextstrain/lat_longs.tsv"
+        shell:
+            "mkdir -p results/nextstrain/auspice && "
+            "augur export --tree {input.tree} --node-data {input.node} --metadata {input.meta} "
+            "--colors {params.colors} --lat-longs {params.latlng} --output {output.json}"
