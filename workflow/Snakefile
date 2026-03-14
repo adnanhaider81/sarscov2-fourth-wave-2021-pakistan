@@ -1,28 +1,61 @@
 # Snakemake pipeline for SARS-CoV-2 fourth-wave analysis in Pakistan
 
-import yaml, os
-cfg = yaml.safe_load(open("config/config.yaml"))
+from pathlib import Path
+import shutil
 
-SAMPLES = [x.get("sample","ISL_001") for x in cfg.get("pairs", [{"sample":"ISL_001","r1":"data-private/ISL_001_R1.fastq.gz","r2":"data-private/ISL_001_R2.fastq.gz"}])]
-META = {x.get("sample","ISL_001"): x for x in cfg.get("pairs", [])}
-if not META:
-    META = {"ISL_001": {"r1":"data-private/ISL_001_R1.fastq.gz","r2":"data-private/ISL_001_R2.fastq.gz"}}
+import yaml
+
+cfg = yaml.safe_load(Path("config/config.yaml").read_text(encoding="utf-8"))
+
+DEFAULT_PAIR = {
+    "sample": "ISL_001",
+    "r1": "data-private/ISL_001_R1.fastq.gz",
+    "r2": "data-private/ISL_001_R2.fastq.gz",
+}
+PAIRS = cfg.get("pairs", [DEFAULT_PAIR]) or [DEFAULT_PAIR]
+SAMPLES = [x.get("sample", DEFAULT_PAIR["sample"]) for x in PAIRS]
+META = {x.get("sample", DEFAULT_PAIR["sample"]): x for x in PAIRS}
 
 THREADS = cfg["params"]["threads"]
 MIN_DP = cfg["params"]["min_depth_consensus"]
 MODEL = cfg["params"]["iqtree_model_wg"]
 BOOT = cfg["params"]["bootstrap"]
 USE_MF = cfg["params"].get("use_model_finder", False)
-AUGUR = cfg.get("augur", {}).get("enable", False)
+AUGUR_ENABLE = cfg.get("augur", {}).get("enable", False)
 PANGOLIN = cfg.get("pangolin", {}).get("enable", True)
+MAX_DATE = cfg.get("params", {}).get("max_date")
+
+FASTQC_OUTPUTS = expand("results/qc/fastqc/{s}", s=SAMPLES)
+FINAL_OUTPUTS = FASTQC_OUTPUTS + [
+    *expand("results/consensus/{s}.fa", s=SAMPLES),
+    "results/consensus/all_consensus.fasta",
+    "results/aln/wg_alignment.fasta",
+    "results/iqtree/wg.treefile",
+    "results/pangolin/lineage_report.csv",
+]
+if AUGUR_ENABLE:
+    FINAL_OUTPUTS.append("results/nextstrain/auspice/sarscov2_fourth_wave.json")
+
+
+def write_accession_list(path, accessions):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        for accession in accessions:
+            handle.write(f"{accession}\n")
+
+
+def concat_text_files(sources, destination):
+    Path(destination).parent.mkdir(parents=True, exist_ok=True)
+    with open(destination, "w", encoding="utf-8") as out_handle:
+        for source in sources:
+            with open(source, encoding="utf-8") as in_handle:
+                shutil.copyfileobj(in_handle, out_handle)
+
 
 rule all:
     input:
-        expand("results/consensus/{s}.fa", s=SAMPLES),
-        "results/consensus/all_consensus.fasta",
-        "results/aln/wg_alignment.fasta",
-        "results/iqtree/wg.treefile",
-        "results/pangolin/lineage_report.csv"
+        FINAL_OUTPUTS
+
 
 rule fetch_ref:
     output:
@@ -32,16 +65,18 @@ rule fetch_ref:
     shell:
         "python analysis/scripts/fetch_genbank_single.py --acc {params.acc} --out_fasta {output.fa}"
 
+
 rule fastqc:
     input:
         r1=lambda w: META[w.s]["r1"],
         r2=lambda w: META[w.s]["r2"]
     output:
-        html1="work/{s}.R1.fastqc.html",
-        html2="work/{s}.R2.fastqc.html"
+        qc_dir=directory("results/qc/fastqc/{s}")
     threads: 1
-    shell:
-        "fastqc -o work {input.r1} {input.r2}"
+    run:
+        Path(output.qc_dir).mkdir(parents=True, exist_ok=True)
+        shell("fastqc --outdir {output.qc_dir} {input.r1} {input.r2}")
+
 
 rule trim:
     input:
@@ -49,31 +84,50 @@ rule trim:
         r2=lambda w: META[w.s]["r2"]
     output:
         r1="work/{s}.R1.trim.fastq.gz",
-        r2="work/{s}.R2.trim.fastq.gz"
+        r1_unpaired=temp("work/{s}.R1.unpaired.fastq.gz"),
+        r2="work/{s}.R2.trim.fastq.gz",
+        r2_unpaired=temp("work/{s}.R2.unpaired.fastq.gz")
     params:
         adapters="env/TruSeq3-PE.fa"
     threads: THREADS
     shell:
         "trimmomatic PE -threads {threads} {input.r1} {input.r2} "
-        "{output.r1} /dev/null {output.r2} /dev/null "
+        "{output.r1} {output.r1_unpaired} {output.r2} {output.r2_unpaired} "
         "ILLUMINACLIP:{params.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:30 MINLEN:50"
+
+
+rule bwa_index:
+    input:
+        ref="refs/ref.fasta"
+    output:
+        amb="refs/ref.fasta.amb",
+        ann="refs/ref.fasta.ann",
+        bwt="refs/ref.fasta.bwt",
+        pac="refs/ref.fasta.pac",
+        sa="refs/ref.fasta.sa"
+    shell:
+        "bwa index {input.ref}"
+
 
 rule map_bwa:
     input:
         r1="work/{s}.R1.trim.fastq.gz",
         r2="work/{s}.R2.trim.fastq.gz",
-        ref="refs/ref.fasta"
+        ref="refs/ref.fasta",
+        idx=rules.bwa_index.output
     output:
-        bam="work/{s}.sorted.bam"
+        bam="work/{s}.sorted.bam",
+        bai="work/{s}.sorted.bam.bai"
     threads: THREADS
     shell:
-        "bwa index {input.ref} && "
         "bwa mem -t {threads} {input.ref} {input.r1} {input.r2} | samtools sort -@ {threads} -o {output.bam} && "
-        "samtools index {output.bam}"
+        "samtools index {output.bam} {output.bai}"
+
 
 rule call_and_consensus:
     input:
         bam="work/{s}.sorted.bam",
+        bai="work/{s}.sorted.bam.bai",
         ref="refs/ref.fasta"
     output:
         depth="work/{s}.depth.txt",
@@ -83,37 +137,60 @@ rule call_and_consensus:
     params:
         min_dp=MIN_DP
     threads: THREADS
-    shell:
-        "samtools depth -a {input.bam} > {output.depth} && "
-        "awk -v OFS='\\t' -v MIN={params.min_dp} '{ if ($3<MIN) print $1, $2-1, $2 }' {output.depth} > {output.mask} && "
-        "bcftools mpileup -Ou -f {input.ref} {input.bam} | bcftools call -mv -Oz -o {output.vcf} && bcftools index {output.vcf} && "
-        "bcftools consensus -f {input.ref} -m {output.mask} {output.vcf} > {output.cons}"
+    run:
+        shell("samtools depth -a {input.bam} > {output.depth}")
+        with open(output.depth, encoding="utf-8") as depth_handle, open(
+            output.mask, "w", encoding="utf-8"
+        ) as mask_handle:
+            for line in depth_handle:
+                chrom, pos, depth = line.rstrip().split("\t")
+                if int(depth) < params.min_dp:
+                    mask_handle.write(f"{chrom}\t{int(pos) - 1}\t{pos}\n")
+        shell(
+            "bcftools mpileup -Ou -f {input.ref} {input.bam} | "
+            "bcftools call -mv -Oz -o {output.vcf} && "
+            "bcftools index {output.vcf} && "
+            "bcftools consensus -f {input.ref} -m {output.mask} {output.vcf} > {output.cons}"
+        )
+
 
 rule combine_consensus:
     input:
         expand("results/consensus/{s}.fa", s=SAMPLES)
     output:
         "results/consensus/all_consensus.fasta"
-    shell:
-        "cat {input} > {output}"
+    run:
+        concat_text_files(input, output[0])
+
 
 rule fetch_context:
     output:
-        "results/refs/context.fasta"
+        acc="work/context_accessions.txt",
+        fa="results/refs/context.fasta"
     run:
-        with open("config/context.txt","w") as f:
-            for acc in cfg.get("context_accessions", []):
-                f.write(acc + "\\n")
-        shell("python analysis/scripts/fetch_genbank.py --acc config/context.txt --out_fasta {output}")
+        accessions = [acc for acc in cfg.get("context_accessions", []) if acc]
+        write_accession_list(output.acc, accessions)
+        if accessions:
+            shell(
+                "python analysis/scripts/fetch_genbank.py --acc {output.acc} --out_fasta {output.fa}"
+            )
+        else:
+            Path(output.fa).parent.mkdir(parents=True, exist_ok=True)
+            Path(output.fa).write_text("", encoding="utf-8")
+
 
 rule align_wg:
     input:
         cons="results/consensus/all_consensus.fasta",
-        ctx="results/refs/context.fasta"
+        ctx=rules.fetch_context.output.fa
     output:
         "results/aln/wg_alignment.fasta"
-    shell:
-        "mkdir -p results/aln && cat {input.cons} {input.ctx} > results/aln/wg_input.fasta && mafft --auto results/aln/wg_input.fasta > {output}"
+    params:
+        merged="results/aln/wg_input.fasta"
+    run:
+        concat_text_files([input.cons, input.ctx], params.merged)
+        shell("mafft --auto {params.merged} > {output}")
+
 
 rule iqtree_wg:
     input:
@@ -121,12 +198,16 @@ rule iqtree_wg:
     output:
         tree="results/iqtree/wg.treefile"
     params:
-        model=MODEL,
-        bb=BOOT,
-        mf=" -m MFP" if USE_MF else ""
+        model_arg="MFP" if USE_MF else MODEL,
+        bb=BOOT
     threads: 2
-    shell:
-        "mkdir -p results/iqtree && iqtree -s {input.aln} {params.mf} -m {params.model} -bb {params.bb} -nt {threads} -pre results/iqtree/wg"
+    run:
+        Path("results/iqtree").mkdir(parents=True, exist_ok=True)
+        shell(
+            "iqtree -s {input.aln} -m {params.model_arg} -bb {params.bb} -nt {threads} "
+            "-pre results/iqtree/wg"
+        )
+
 
 rule pangolin:
     input:
@@ -134,13 +215,16 @@ rule pangolin:
     output:
         "results/pangolin/lineage_report.csv"
     run:
+        Path("results/pangolin").mkdir(parents=True, exist_ok=True)
         if PANGOLIN:
-            shell("mkdir -p results/pangolin && pangolin {input.cons} --outfile results/pangolin/lineage_report.csv")
+            shell("pangolin {input.cons} --outfile {output}")
         else:
-            shell("mkdir -p results/pangolin && echo 'disabled' > results/pangolin/lineage_report.csv")
+            Path(output[0]).write_text(
+                "taxon,lineage,status\npipeline,NA,disabled\n",
+                encoding="utf-8",
+            )
 
-# Nextstrain steps
-AUGUR_ENABLE = cfg.get("augur", {}).get("enable", False)
+
 if AUGUR_ENABLE:
     rule augur_filter:
         input:
@@ -150,20 +234,24 @@ if AUGUR_ENABLE:
             seqs="results/nextstrain/filtered.fasta",
             meta="results/nextstrain/filtered_metadata.tsv"
         params:
-            minlen=cfg.get("params", {}).get("filter_min_length", 29500)
-        shell:
-            "mkdir -p results/nextstrain && "
-            "augur filter --sequences {input.seqs} --metadata {input.meta} "
-            "--min-length {params.minlen} --max-date 2025-12-31 --min-date 2019-12-01 "
-            "--output {output.seqs} --metadata-output {output.meta}"
+            minlen=cfg.get("params", {}).get("filter_min_length", 29500),
+            max_date_arg=f" --max-date {MAX_DATE}" if MAX_DATE else ""
+        run:
+            Path("results/nextstrain").mkdir(parents=True, exist_ok=True)
+            shell(
+                "augur filter --sequences {input.seqs} --metadata {input.meta} "
+                "--min-length {params.minlen}{params.max_date_arg} --min-date 2019-12-01 "
+                "--output {output.seqs} --metadata-output {output.meta}"
+            )
 
     rule augur_align:
         input:
-            seqs="results/nextstrain/filtered.fasta"
+            seqs="results/nextstrain/filtered.fasta",
+            ref="refs/ref.fasta"
         output:
             aln="results/nextstrain/aligned.fasta"
         shell:
-            "augur align --sequences {input.seqs} --reference-sequence refs/ref.fasta --output {output.aln} --fill-gaps"
+            "augur align --sequences {input.seqs} --reference-sequence {input.ref} --output {output.aln} --fill-gaps"
 
     rule augur_tree_full:
         input:
@@ -193,7 +281,6 @@ if AUGUR_ENABLE:
     rule augur_export:
         input:
             tree="results/nextstrain/tree_time.nwk",
-            aln="results/nextstrain/aligned.fasta",
             meta="results/nextstrain/filtered_metadata.tsv",
             node="results/nextstrain/node_data.json"
         output:
@@ -201,7 +288,9 @@ if AUGUR_ENABLE:
         params:
             colors="nextstrain/colors.tsv",
             latlng="nextstrain/lat_longs.tsv"
-        shell:
-            "mkdir -p results/nextstrain/auspice && "
-            "augur export --tree {input.tree} --node-data {input.node} --metadata {input.meta} "
-            "--colors {params.colors} --lat-longs {params.latlng} --output {output.json}"
+        run:
+            Path("results/nextstrain/auspice").mkdir(parents=True, exist_ok=True)
+            shell(
+                "augur export --tree {input.tree} --node-data {input.node} --metadata {input.meta} "
+                "--colors {params.colors} --lat-longs {params.latlng} --output {output.json}"
+            )

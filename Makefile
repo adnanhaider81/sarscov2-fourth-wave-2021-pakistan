@@ -4,7 +4,7 @@ SHELL := /bin/bash
 ENV_NAME := sarscov2-fourthwave-env
 THREADS ?= 4
 
-.PHONY: env run dry test nextstrain clean help
+.PHONY: env run dry test nextstrain figure clean help
 
 help:
 	@echo "make env        - create conda env"
@@ -12,7 +12,8 @@ help:
 	@echo "make nextstrain - build Auspice JSON with Augur"
 	@echo "make dry        - dry run steps"
 	@echo "make test       - quick sanity check on plotting"
-	@echo "make clean      - remove work and results"
+	@echo "make figure     - regenerate the pipeline overview figure"
+	@echo "make clean      - remove generated workflow outputs"
 
 env:
 	conda env create -f env/environment.yml || echo "Env may already exist"
@@ -34,5 +35,9 @@ test:
 	python analysis/scripts/example_qc_plot.py --in data-example/example_counts.tsv --out results-example/example_plot.png
 	@echo "Wrote results-example/example_plot.png"
 
+figure:
+	python analysis/scripts/pipeline_figure.py --out results-example/pipeline_figure.png
+	@echo "Wrote results-example/pipeline_figure.png"
+
 clean:
-	rm -rf work results results-example logs .snakemake
+	rm -rf work results refs logs .snakemake

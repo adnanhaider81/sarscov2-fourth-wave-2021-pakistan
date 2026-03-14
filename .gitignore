@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.snakemake/
+logs/
+refs/
+results/
+work/
+config/context.txt
+data-private/
