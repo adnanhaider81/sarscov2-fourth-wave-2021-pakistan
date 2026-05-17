@@ -5,7 +5,11 @@ authors:
   - family-names: Haider
     given-names: Syed Adnan
 version: 1.0.0
-date-released: 2025-09-29
+date-released: 2026-05-17
+type: software
+abstract: "A reproducible Snakemake workflow for SARS-CoV-2 fourth-wave Pakistan analysis, including QC, trimming, reference-based consensus generation, lineage assignment, phylogeny, and optional Nextstrain/Auspice outputs."
+repository-code: "https://github.com/adnanhaider81/sarscov2-fourth-wave-2021-pakistan"
+license: MIT
 preferred-citation:
   type: article
   title: Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic
