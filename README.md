@@ -1,9 +1,11 @@
-# Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic
+# SARS-CoV-2 Fourth-Wave Genomics Workflow, Pakistan 2021
 
 [![DOI](https://zenodo.org/badge/1066185008.svg)](https://zenodo.org/badge/latestdoi/1066185008)
 [![Smoke test](https://github.com/adnanhaider81/sarscov2-fourth-wave-2021-pakistan/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/adnanhaider81/sarscov2-fourth-wave-2021-pakistan/actions/workflows/smoke-test.yml)
 
-Reproducible code that mirrors the Journal of Medical Virology article (2022). DOI: 10.1002/jmv.27957
+Reproducible code that mirrors the Journal of Medical Virology article.
+
+Published paper: Umair M, Ikram A, Rehman Z, Haider SA, Ammar M, Badar N, Ali Q, Rana MS, Salman M. Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic. Journal of Medical Virology. 2022. https://doi.org/10.1002/jmv.27957
 
 ## Program summary
 This repository provides an end-to-end pipeline that matches the study design. Steps run under one Snakemake workflow and can be executed on a workstation or small server.

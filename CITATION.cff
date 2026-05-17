@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: Please cite this code and the associated paper.
-title: SARS-CoV-2 fourth wave Pakistan analysis
+title: SARS-CoV-2 Fourth-Wave Genomics Workflow, Pakistan 2021
 authors:
   - family-names: Haider
     given-names: Syed Adnan
