@@ -10,7 +10,7 @@ Published paper: Umair M, Ikram A, Rehman Z, Haider SA, Ammar M, Badar N, Ali Q,
 ## Program summary
 This repository provides an end-to-end pipeline that matches the study design. Steps run under one Snakemake workflow and can be executed on a workstation or small server.
 
-## Pipeline overview
+## Workflow overview
 ![Pipeline overview](results-example/pipeline_figure.png)
 
 Regenerate the figure with:
@@ -131,7 +131,7 @@ You can produce an Auspice JSON for interactive viewing.
 
 ## How to cite
 - Paper: Umair M, Ikram A, Rehman Z, Haider SA, Ammar M, Badar N, Ali Q, Rana MS, Salman M. Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic. Journal of Medical Virology. 2022. https://doi.org/10.1002/jmv.27957
-- Software: Haider SA. SARS-CoV-2 fourth wave Pakistan analysis. Version 1.0.0. Zenodo. https://doi.org/10.5281/zenodo.20257747
+- Software: Haider SA. SARS-CoV-2 Fourth-Wave Genomics Workflow, Pakistan 2021. Version 1.0.0. Zenodo. https://doi.org/10.5281/zenodo.20257747
 - All-version software DOI: https://doi.org/10.5281/zenodo.20257746
 
 ## References
