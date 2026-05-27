@@ -129,6 +129,10 @@ You can produce an Auspice JSON for interactive viewing.
    ```
 4. Start Auspice and open `results/nextstrain/auspice/sarscov2_fourth_wave.json`.
 
+## Data governance
+
+See [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) for public-data, restricted-data, and sample-identifier handling rules.
+
 ## How to cite
 - Paper: Umair M, Ikram A, Rehman Z, Haider SA, Ammar M, Badar N, Ali Q, Rana MS, Salman M. Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic. Journal of Medical Virology. 2022. https://doi.org/10.1002/jmv.27957
 - Software: Haider SA. SARS-CoV-2 Fourth-Wave Genomics Workflow, Pakistan 2021. Version 1.0.0. Zenodo. https://doi.org/10.5281/zenodo.20257747
