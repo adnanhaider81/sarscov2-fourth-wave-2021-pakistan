@@ -131,7 +131,7 @@ You can produce an Auspice JSON for interactive viewing.
 
 ## Apptainer/Singularity container
 
-An HPC-friendly container recipe is provided at `containers/Apptainer.def`. Build it from the repository root:
+HPC-friendly Apptainer/Singularity support is available at `containers/Apptainer.def`. Build it from the repository root:
 
 ```bash
 apptainer build containers/sarscov2-fourth-wave-2021-pakistan.sif containers/Apptainer.def
