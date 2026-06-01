@@ -7,6 +7,20 @@ Reproducible code that mirrors the Journal of Medical Virology article.
 
 Published paper: Umair M, Ikram A, Rehman Z, Haider SA, Ammar M, Badar N, Ali Q, Rana MS, Salman M. Genomic diversity of SARS-CoV-2 in Pakistan during the fourth wave of pandemic. Journal of Medical Virology. 2022. https://doi.org/10.1002/jmv.27957
 
+## Abbreviations
+
+| Term | Meaning |
+| --- | --- |
+| SARS-CoV-2 | Severe acute respiratory syndrome coronavirus 2 |
+| iSeq | Illumina iSeq sequencing platform |
+| Pangolin | SARS-CoV-2 lineage assignment tool |
+| Nextstrain | Open-source platform for pathogen genome tracking |
+| Augur | Nextstrain command-line analysis toolkit |
+| TreeTime | Time-resolved phylogenetic analysis tool |
+| MAFFT | Multiple-sequence alignment program |
+| IQ-TREE | Maximum-likelihood phylogenetic tree program |
+| QC | Quality control |
+
 ## Program summary
 This repository provides an end-to-end pipeline that matches the study design. Steps run under one Snakemake workflow and can be executed on a workstation or small server.
 
