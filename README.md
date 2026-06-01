@@ -129,6 +129,16 @@ You can produce an Auspice JSON for interactive viewing.
    ```
 4. Start Auspice and open `results/nextstrain/auspice/sarscov2_fourth_wave.json`.
 
+## Apptainer/Singularity container
+
+An HPC-friendly container recipe is provided at `containers/Apptainer.def`. Build it from the repository root:
+
+```bash
+apptainer build containers/sarscov2-fourth-wave-2021-pakistan.sif containers/Apptainer.def
+```
+
+Use the image on systems where Apptainer or Singularity is preferred over Docker.
+
 ## Data governance
 
 See [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) for public-data, restricted-data, and sample-identifier handling rules.

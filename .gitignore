@@ -9,3 +9,4 @@ results/
 work/
 config/context.txt
 data-private/
+containers/*.sif
